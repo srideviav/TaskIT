@@ -1,5 +1,5 @@
-const validate = (schema) => (req, res, next) => {
-  const result = schema.safeParse(req.body);
+const validate = (schema, property = "body") => (req, res, next) => {
+  const result = schema.safeParse(req[property]);
 
   if (!result.success) {
     return res.status(400).json({
@@ -8,9 +8,7 @@ const validate = (schema) => (req, res, next) => {
     });
   }
 
-  // Replace body with validated + sanitized data
-  req.body = result.data;
-
+  req[property] = result.data;
   next();
 };
 
