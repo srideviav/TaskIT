@@ -46,8 +46,6 @@ exports.getAllProjectsByUserId = async (req, res, next) => {
 
 exports.updateProject = async (req, res, next) => {
   try {
-    const userId = req.user.id;   // from auth middleware
-
     const projectExists = await ProjectService.getProjectById(req.params.projectId);
 
     if (!projectExists) {
@@ -56,8 +54,7 @@ exports.updateProject = async (req, res, next) => {
 
     const updatedProject = await ProjectService.updateProject(
       req.params.projectId,
-      req.body,
-      userId    
+      req.body    
     );
 
     res.status(200).json({

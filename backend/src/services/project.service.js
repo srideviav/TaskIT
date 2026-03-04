@@ -21,7 +21,10 @@ exports.getAllProjectsByUserId = async (userId) => {
     return projects;
 }
 exports.updateProject = async (projectId, projectData) => {
-    const updatedProject = await Project.findByIdAndUpdate(projectId, projectData, { new: true });
+    const updatedProject = await Project.findByIdAndUpdate(
+        projectId, 
+        projectData, 
+        { returnDocument: 'after', runValidators: true });
     return updatedProject;
 }
 exports.deleteProject = async (projectId) => {
