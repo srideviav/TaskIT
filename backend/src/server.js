@@ -2,6 +2,7 @@ require("dotenv").config();
 
 const express = require("express");
 const http = require("http");
+const cors = require("cors");
 
 const connectDB = require("./config/db.config");
 const { initSocket } = require("./config/socket.config");
@@ -15,7 +16,13 @@ const PORT = process.env.PORT ;
 
 const app = express();
 app.use(express.json());
-
+app.use(express.urlencoded({ extended: true }));
+app.use(
+  cors({
+    origin: "http://localhost:3000",
+    credentials: true,
+  })
+);
 const server = http.createServer(app);
 
 connectDB();
