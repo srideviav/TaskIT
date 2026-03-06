@@ -4,7 +4,7 @@ import { createContext, useState, useEffect, ReactNode } from "react";
 import { setAuthToken } from "../lib/axios";
 
 interface IUser {
-  id: number;
+  id: string;
   name: string;
   email: string;
   token: string;
