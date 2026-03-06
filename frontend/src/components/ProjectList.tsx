@@ -4,13 +4,15 @@ import React, { useContext } from "react";
 import { getAllProjects, createProject, updateProject, deleteProject } from "../services/projects.service";
 import { AuthContext } from "../context/authContext";
 import { Button, Modal, Form, Select, Input, message, Collapse, Space, Popconfirm } from "antd";
-import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
+import { EditOutlined, DeleteOutlined, FolderOpenOutlined } from "@ant-design/icons";
+import ProjectDetail from "./ProjectDetail";
 
 export default function ProjectList() {
     const [projects, setProjects] = React.useState([]);
     const [isModalOpen, setIsModalOpen] = React.useState(false);
     const [editingProject, setEditingProject] = React.useState<any>(null);
     const [loading, setLoading] = React.useState(false);
+    const [selectedProject, setSelectedProject] = React.useState<any>(null);
     const [form] = Form.useForm();
     const auth = useContext(AuthContext);
 
@@ -101,6 +103,19 @@ export default function ProjectList() {
         return <p>Loading...</p>;
     }
 
+    // If a project is selected, show the project detail view
+    if (selectedProject) {
+        return (
+            <ProjectDetail
+                project={selectedProject}
+                onBack={() => {
+                    setSelectedProject(null);
+                    fetchProjects();
+                }}
+            />
+        );
+    }
+
     const collapsedItems = projects.map((project: any) => ({
         key: project._id,
         label: project.name,
@@ -109,6 +124,13 @@ export default function ProjectList() {
                 <p><strong>Description:</strong> {project.description || "No description"}</p>
                 <p><strong>Members:</strong> {project.members?.join(", ") || "No members"}</p>
                 <Space style={{ marginTop: "16px" }}>
+                    <Button
+                        type="primary"
+                        icon={<FolderOpenOutlined />}
+                        onClick={() => setSelectedProject(project)}
+                    >
+                        Open Project
+                    </Button>
                     <Button
                         type="primary"
                         icon={<EditOutlined />}
