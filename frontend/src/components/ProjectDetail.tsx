@@ -3,9 +3,11 @@
 import React, { useContext, useState } from "react";
 import { getAllTasks, createTask } from "../services/tasks.service";
 import { AuthContext } from "../context/authContext";
-import { Button, Modal, Form, Input, message, List, Card, Space, Empty } from "antd";
+import { Button, Modal, Form, Input, message, Space, Empty } from "antd";
 import { PlusOutlined, ArrowLeftOutlined } from "@ant-design/icons";
-import TaskList from "./TaskList";
+import TaskDetail from "./TaskDetail";
+import { initSocket, joinProject } from "../lib/socket";
+import { useTaskSocket } from "../hooks/useSocket";
 
 interface Project {
     _id: string;
@@ -28,10 +30,40 @@ export default function ProjectDetail({ project, onBack }: ProjectDetailProps) {
     const [form] = Form.useForm();
     const auth = useContext(AuthContext);
 
-    const userId = auth?.user?.id?.toString();
+    const userId = auth?.user?._id?.toString();
+
+    const handleTaskCreated = (newTask: any) => {
+        if (newTask.projectId === project._id) {
+            setTasks((prev) => [newTask, ...prev]);
+            message.success("New task created by team member!");
+        }
+    };
+
+    const handleTaskUpdated = (updatedTask: any) => {
+        if (updatedTask.projectId === project._id) {
+            setTasks((prev) =>
+                prev.map((task) => (task._id === updatedTask._id ? updatedTask : task))
+            );
+        }
+    };
+
+    const handleTaskDeleted = (deletedTask: any) => {
+        if (deletedTask.projectId === project._id) {
+            setTasks((prev) => prev.filter((task) => task._id !== deletedTask._id));
+            message.info("A task was deleted by team member.");
+        }
+    };
+
+    // Setup task socket listeners
+    useTaskSocket(handleTaskCreated, handleTaskUpdated, handleTaskDeleted);
 
     React.useEffect(() => {
         fetchTasks();
+        // Initialize socket connection
+        const socket = initSocket();
+        if (socket) {
+            joinProject(project._id);
+        }
     }, [project._id]);
 
     const fetchTasks = async () => {
@@ -70,7 +102,7 @@ export default function ProjectDetail({ project, onBack }: ProjectDetailProps) {
                 description: values.description,
                 projectId: project._id,
                 status: values.status || "To Do",
-                assignee: values.assignee || userId,
+                assignedTo: values.assignedTo || userId,
             };
             await createTask(taskData);
             message.success("Task created successfully!");
@@ -90,7 +122,8 @@ export default function ProjectDetail({ project, onBack }: ProjectDetailProps) {
         setSelectedTask(null);
     };
 
-    const handleTaskUpdated = () => {
+    const handleTaskDetailsUpdated = () => {
+        // Refetch tasks after modal closes
         fetchTasks();
         handleTaskModalClose();
     };
@@ -181,18 +214,32 @@ export default function ProjectDetail({ project, onBack }: ProjectDetailProps) {
                 {tasks.length === 0 ? (
                     <Empty description="No tasks found. Create one to get started!" />
                 ) : (
-                    <List
-                        dataSource={tasks}
-                        renderItem={(task) => (
-                            <List.Item
+                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                        {tasks.map((task) => (
+                            <div
                                 key={task._id}
                                 onClick={() => handleTaskClick(task)}
-                                style={{ cursor: "pointer" }}
+                                style={{
+                                    padding: "12px 16px",
+                                    border: "1px solid #f0f0f0",
+                                    borderRadius: "6px",
+                                    cursor: "pointer",
+                                    display: "flex",
+                                    justifyContent: "space-between",
+                                    alignItems: "center",
+                                    transition: "all 0.3s",
+                                }}
+                                onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#1890ff")}
+                                onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#f0f0f0")}
                             >
-                                <List.Item.Meta
-                                    title={task.title}
-                                    description={task.description}
-                                />
+                                <div style={{ flex: 1 }}>
+                                    <p style={{ margin: "0 0 4px 0", fontWeight: "500" }}>
+                                        {task.title}
+                                    </p>
+                                    <p style={{ margin: 0, color: "#666", fontSize: "12px" }}>
+                                        {task.description}
+                                    </p>
+                                </div>
                                 <div
                                     style={{
                                         padding: "4px 12px",
@@ -200,22 +247,24 @@ export default function ProjectDetail({ project, onBack }: ProjectDetailProps) {
                                         borderRadius: "4px",
                                         color: "white",
                                         fontSize: "12px",
+                                        marginLeft: "12px",
+                                        whiteSpace: "nowrap",
                                     }}
                                 >
                                     {task.status || "No Status"}
                                 </div>
-                            </List.Item>
-                        )}
-                    />
+                            </div>
+                        ))}
+                    </div>
                 )}
             </div>
 
             {selectedTask && (
-                <TaskList
+                <TaskDetail
                     open={isTaskDetailOpen}
                     task={selectedTask}
                     onClose={handleTaskModalClose}
-                    onTaskUpdated={handleTaskUpdated}
+                    onTaskUpdated={handleTaskDetailsUpdated}
                 />
             )}
         </div>

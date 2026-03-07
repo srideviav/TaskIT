@@ -2,6 +2,7 @@
 
 import React, { useContext } from "react";
 import { getAllProjects, createProject, updateProject, deleteProject } from "../services/projects.service";
+import { getAllUsers } from "../services/auth.service";
 import { AuthContext } from "../context/authContext";
 import { Button, Modal, Form, Select, Input, message, Collapse, Space, Popconfirm } from "antd";
 import { EditOutlined, DeleteOutlined, FolderOpenOutlined } from "@ant-design/icons";
@@ -13,12 +14,12 @@ export default function ProjectList() {
     const [editingProject, setEditingProject] = React.useState<any>(null);
     const [loading, setLoading] = React.useState(false);
     const [selectedProject, setSelectedProject] = React.useState<any>(null);
+    const [users, setUsers] = React.useState<any[]>([]);
     const [form] = Form.useForm();
     const auth = useContext(AuthContext);
 
-    const userId = auth?.user?.id?.toString();
-    if(!userId) return ;
- 
+    const userId = auth?.user?._id?.toString();
+
     const fetchProjects = async () => {
         try {
             const projectsData = await getAllProjects(userId);
@@ -28,9 +29,23 @@ export default function ProjectList() {
         }
     };
 
+    const fetchUsers = async () => {
+        try {
+            const usersList = await getAllUsers();
+            setUsers(usersList);
+        } catch (error) {
+            console.error("Failed to fetch users:", error);
+            message.error("Failed to fetch users");
+        }
+    };
+
     React.useEffect(() => {
+        if (!userId) return;
+
         fetchProjects();
+        fetchUsers();
     }, [userId]);
+
 
     const handleCreateClick = () => {
         setEditingProject(null);
@@ -40,9 +55,12 @@ export default function ProjectList() {
 
     const handleEdit = (project: any) => {
         setEditingProject(project);
+        // Extract member IDs if members are objects, otherwise use as-is
+        const memberIds = project.members?.map((m: any) => (typeof m === 'object' ? m._id : m)) || [];
         form.setFieldsValue({
             name: project.name,
             description: project.description,
+            members: memberIds,
         });
         setIsModalOpen(true);
     };
@@ -65,6 +83,7 @@ export default function ProjectList() {
     };
 
     const handleSubmit = async (values: any) => {
+        console.log("Form values:", values);
         setLoading(true);
         try {
             if (editingProject) {
@@ -72,17 +91,18 @@ export default function ProjectList() {
                 const projectData = {
                     name: values.name,
                     description: values.description,
-                    members: editingProject.members,
+                    members: values.members || editingProject.members,
                 };
                 await updateProject(editingProject._id, projectData);
                 message.success("Project updated successfully!");
             } else {
                 // Create new project
+                if (!userId) return null;
                 const projectData = {
                     name: values.name,
                     description: values.description,
-                    owner: userId,
-                    members: values.member || [],
+                    owner: userId ,
+                    members: values.members || [],
                 };
                 await createProject(projectData);
                 message.success("Project created successfully!");
@@ -122,7 +142,13 @@ export default function ProjectList() {
         children: (
             <div>
                 <p><strong>Description:</strong> {project.description || "No description"}</p>
-                <p><strong>Members:</strong> {project.members?.join(", ") || "No members"}</p>
+                <p>
+                    <strong>Members:</strong>{" "}
+                    {project.members.length > 0
+                        ? project.members.map((m: any) => m.name).join(", ")
+                        : "No members"}
+                </p>
+                 
                 <Space style={{ marginTop: "16px" }}>
                     <Button
                         type="primary"
@@ -195,25 +221,18 @@ export default function ProjectList() {
 
 
                     <Form.Item
-                        label="Member"
-                        name="member"
-                        // rules={[{ required: true, message: "Please select a member" }]}
-                    >
+                        label="Members"
+                        name="members"
+                     >
                         <Select
-                            placeholder="Search and select member"
+                            mode="multiple"
+                            placeholder="Search and select members"
                             showSearch
-                            optionFilterProp="children"
-                            filterOption={(input, option) =>
-                                (option?.children as unknown as string)
-                                    .toLowerCase()
-                                    .includes(input.toLowerCase())
-                            }
-                        >
-                            <Select.Option value="1">John Doe</Select.Option>
-                            <Select.Option value="2">Jane Smith</Select.Option>
-                            <Select.Option value="3">Michael Brown</Select.Option>
-                            <Select.Option value="4">Emma Wilson</Select.Option>
-                        </Select>
+                            options={users.map((user) => ({
+                                label: user.name,
+                                value: user._id,
+                            }))}
+                        />
                     </Form.Item>
 
                     <Form.Item>

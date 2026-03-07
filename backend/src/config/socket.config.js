@@ -32,6 +32,7 @@ const initSocket = (server) => {
     console.log("User connected:", socket.id);
 
     socket.on("joinProject", (projectId) => {
+      console.log("check:", projectId,"and",socket);
       socket.join(projectId);
       console.log(`User ${socket.user.id} joined project ${projectId}`);
     });

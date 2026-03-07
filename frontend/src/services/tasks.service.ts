@@ -4,7 +4,8 @@ interface Task {
     title: string,
     description: string,
     status: string,
-    assignee: string,
+    assignedTo: string,
+    comments?: string[],
 }
 
 export const createTask = async (task: Task) => {
@@ -29,7 +30,7 @@ export const getAllTasks = async (projectId: String) => {
 
 export const getTask = async (taskId: String) => {
     try {
-        const response = await API.get(`/taskIt/tasks/getByProject/${taskId}`);
+        const response = await API.get(`/taskIt/tasks/get/${taskId}`);
         return response.data.data;
     } catch (error) {
         console.error("Failed to fetch tasks by project:", error);

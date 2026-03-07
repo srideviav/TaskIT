@@ -1,12 +1,14 @@
+"use client";
+
 import Sidebar from "../../components/Sidebar";
-import Navbar from "../../components/Navbar";
 import StatCard from "./statCard";
 import { Card, Col, Row } from "antd";
+import { useProtectedRoute } from "@/src/hooks/useProtectedRoute";
 
 export default function DashboardPage() {
+    useProtectedRoute();
     return (
-        <div className="h-screen flex flex-col">
-            <Navbar />
+        <div className="flex flex-1 flex-col">
             <div className="flex flex-1">
                  <Sidebar /> 
                 <div className="flex-1 p-6 bg-gray-100"> 

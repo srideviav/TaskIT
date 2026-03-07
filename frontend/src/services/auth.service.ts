@@ -1,14 +1,14 @@
 import API from "../lib/axios";
 
 interface Register {
-    name: String,
-    email: String,
-    password: String
+    name: string,
+    email: string,
+    password: string
 }
 
 interface Login {
-    email: String,
-    password: String
+    email:string,
+    password:string
 }
 
 export const registerUser = async (user: Register) => {
@@ -24,9 +24,20 @@ export const registerUser = async (user: Register) => {
 export const loginUser = async (user: Login) => {
     try {
         const response = await API.post('/taskIt/users/login', user);
-        return response.data.data;
+        console.log("Login response in auth service:", response.data);
+        return response.data;
     } catch (error) {
         console.error("Login failed in auth service:", error);
+        throw error;
+    }
+}
+
+export const getAllUsers = async () => {
+    try {
+        const response = await API.get('/taskIt/users/allUsers');
+        return response.data.data;
+    } catch (error) {
+        console.error("Failed to fetch users in auth service:", error);
         throw error;
     }
 }

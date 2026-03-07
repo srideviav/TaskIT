@@ -15,7 +15,7 @@ exports.getProjectById = async (projectId) => {
     return project;
 }
 exports.getAllProjectsByUserId = async (userId) => {
-    const projects = await Project.find({ owner: userId })
+    const projects = await Project.find({ $or: [{ owner: userId }, { members: userId }] })
         .populate('owner', 'name email')
         .populate('members', 'name email');
     return projects;
