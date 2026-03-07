@@ -157,39 +157,91 @@ export default function ProjectDetail({ project, onBack }: ProjectDetailProps) {
 
     return (
         <div style={{ padding: "20px" }}>
-            <Space style={{ marginBottom: "20px", width: "100%" }}>
-                <Button
-                    type="text"
-                    icon={<ArrowLeftOutlined />}
-                    onClick={onBack}
-                >
-                    Back to Projects
-                </Button>
-            </Space>
-
             <div style={{ marginBottom: "20px" }}>
                 <h1 className="text-2xl font-semibold mb-2">
                     {project.name}
                 </h1>
                 <p className="text-gray-600">
-                    <strong>Project Description:</strong>{" "}{project.description}</p>
+                     {project.description}</p>
                 <p>
                     <strong>Members:</strong>{" "}
                     {project.members && project.members.length > 0
                         ? project.members.map((m: any) => m.name).join(", ")
                         : "No members"}
                 </p>
-
             </div>
 
-            <Button
-                type="primary"
-                icon={<PlusOutlined />}
-                onClick={handleCreateClick}
-                style={{ marginBottom: "20px" }}
-            >
-                Create New Task
-            </Button>
+            <Space style={{ marginBottom: "20px" }}>
+                <Button
+                    icon={<ArrowLeftOutlined />}
+                    onClick={onBack}
+                    style={{
+                        backgroundColor: "#032b53",
+                        color: "white",
+                        border: "none"
+                    }}
+                >
+                    Back to Projects
+                </Button>
+                
+                <Button
+                    icon={<PlusOutlined />}
+                    onClick={handleCreateClick}
+                    style={{
+                        backgroundColor: "#032b53",
+                        color: "white",
+                        border: "none"
+                    }}
+                >
+                    Create New Task
+                </Button>
+                     <Input
+                        placeholder="Search tasks by title..."
+                        value={searchValue}
+                        onChange={(e) => {
+                            setSearchValue(e.target.value);
+                            setCurrentPage(1);
+                        }}
+                        style={{ width: "200px" }}
+                        allowClear
+                    />
+                    
+                    <Select
+                        placeholder="Filter by status"
+                        style={{ width: "150px" }}
+                        value={statusFilter || "all"}
+                        onChange={(value) => {
+                            setStatusFilter(value === "all" ? undefined : value);
+                            setCurrentPage(1);
+                        }}
+                        options={[
+                            { label: "All Status", value: "all" },
+                            { label: "To Do", value: "To Do" },
+                            { label: "In Progress", value: "In Progress" },
+                            { label: "Done", value: "Done" },
+                        ]}
+                        allowClear
+                    />
+                    
+                    <Select
+                        placeholder="Filter by assignee"
+                        style={{ width: "180px" }}
+                        value={assigneeFilter}
+                        onChange={(value) => {
+                            setAssigneeFilter(value);
+                            setCurrentPage(1);
+                        }}
+                        options={[
+                            { label: "All Assignees", value: undefined },
+                            ...users.map((user) => ({
+                                label: user.name,
+                                value: user._id,
+                            })),
+                        ]}
+                        allowClear
+                    />
+                 
+            </Space>
 
             <Modal
                 title="Create New Task"
@@ -261,56 +313,6 @@ export default function ProjectDetail({ project, onBack }: ProjectDetailProps) {
             </Modal>
 
             <div>
-                <h2 className="text-xl font-semibold mb-4">Tasks</h2>
-                
-                <Space style={{ marginBottom: "20px", width: "100%", display: "flex", gap: "10px", flexWrap: "wrap" }}>
-                    <Input
-                        placeholder="Search tasks by title..."
-                        value={searchValue}
-                        onChange={(e) => {
-                            setSearchValue(e.target.value);
-                            setCurrentPage(1);
-                        }}
-                        style={{ width: "200px" }}
-                        allowClear
-                    />
-                    
-                    <Select
-                        placeholder="Filter by status"
-                        style={{ width: "150px" }}
-                        value={statusFilter || "all"}
-                        onChange={(value) => {
-                            setStatusFilter(value === "all" ? undefined : value);
-                            setCurrentPage(1);
-                        }}
-                        options={[
-                            { label: "All Status", value: "all" },
-                            { label: "To Do", value: "To Do" },
-                            { label: "In Progress", value: "In Progress" },
-                            { label: "Done", value: "Done" },
-                        ]}
-                        allowClear
-                    />
-                    
-                    <Select
-                        placeholder="Filter by assignee"
-                        style={{ width: "180px" }}
-                        value={assigneeFilter}
-                        onChange={(value) => {
-                            setAssigneeFilter(value);
-                            setCurrentPage(1);
-                        }}
-                        options={[
-                            { label: "All Assignees", value: undefined },
-                            ...users.map((user) => ({
-                                label: user.name,
-                                value: user._id,
-                            })),
-                        ]}
-                        allowClear
-                    />
-                </Space>
-
                 {tasks.length === 0 ? (
                     <Empty description="No tasks found. Create one to get started!" />
                 ) : (() => {

@@ -13,7 +13,7 @@ export default function Navbar() {
       justifyContent: "space-between",
       alignItems: "center",
       padding: "16px 24px",
-      backgroundColor: "#0066cc",
+      backgroundColor: "#032b53",
       color: "white"
     }}>
 

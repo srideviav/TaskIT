@@ -1,14 +1,22 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useContext, useState } from "react";
 import { Modal, Button, Form, Input, Select, message, Space, Popconfirm } from "antd";
-import { EditOutlined, DeleteOutlined } from "@ant-design/icons";
-import { updateTask, deleteTask, getTask } from "../services/tasks.service";
+import { EditOutlined, DeleteOutlined, SendOutlined } from "@ant-design/icons";
+import { updateTask, deleteTask, getTask, addComment } from "../services/tasks.service";
 import { getAllUsers } from "../services/auth.service";
+import { AuthContext } from "../context/authContext";
 
 interface IUser {
     _id: string;
     name: string;
+}
+
+interface IComment {
+    _id?: string;
+    text: string;
+    userId?: string | IUser;
+    createdAt?: Date | string;
 }
 
 interface Task {
@@ -18,7 +26,7 @@ interface Task {
     status?: string;
     assignedTo?: string | IUser;
     projectId?: string;
-    comments?: string[];
+    comments?: IComment[];
 }
 
 interface TaskDetailModalProps {
@@ -44,6 +52,10 @@ export default function TaskDetail({
     const [form] = Form.useForm();
     const [taskDetails, setTaskDetails] = useState<Task>(task);
     const [users, setUsers] = useState<IUser[]>([]);
+    const [newComment, setNewComment] = useState("");
+    const [addingComment, setAddingComment] = useState(false);
+    const auth = useContext(AuthContext);
+    
 
     React.useEffect(() => {
         if (open && task._id) {
@@ -51,6 +63,8 @@ export default function TaskDetail({
             loadUsers();
         }
     }, [open, task]);
+
+        const userId = auth?.user?._id?.toString();
 
     const fetchTaskDetails = async () => {
         try {
@@ -124,6 +138,7 @@ export default function TaskDetail({
         try {
             setLoading(true);
             // Extract assignedTo ID if it's an object, otherwise use as-is
+            console.log("comments:",taskDetails)
             const assignedToId = values.assignedTo
                 ? (typeof values.assignedTo === 'object' ? values.assignedTo._id : values.assignedTo)
                 : undefined;
@@ -132,7 +147,7 @@ export default function TaskDetail({
                 description: values.description,
                 status: values.status,
                 assignedTo: assignedToId,
-                comments: values.comments || [],
+                // comments: taskDetails.comments || [],
             };
             await updateTask(task._id, updateData);
             message.success("Task updated successfully!");
@@ -143,6 +158,30 @@ export default function TaskDetail({
             message.error("Failed to update task. Please try again.");
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleAddComment = async () => {
+        if (!newComment.trim()) {
+            message.warning("Please enter a comment");
+            return;
+        }
+
+        try {
+            setAddingComment(true);   
+            if(!userId) return null ;         
+            await addComment(task._id, newComment, userId);
+            
+            const updatedTask = await getTask(task._id);
+            setTaskDetails(updatedTask);
+            
+            setNewComment("");
+            message.success("Comment added successfully!");
+        } catch (error) {
+            console.error("Failed to add comment:", error);
+            message.error("Failed to add comment. Please try again.");
+        } finally {
+            setAddingComment(false);
         }
     };
 
@@ -273,7 +312,7 @@ export default function TaskDetail({
                             {taskDetails.status}
                         </span>
                     </p>
-                    <p style={{ marginBottom: "16px" }}>
+                    <p style={{ marginBottom: "24px" }}>
                         <strong>Assignee:</strong>{" "}
                         {taskDetails.assignedTo
                             ? typeof taskDetails.assignedTo === "object"
@@ -281,6 +320,83 @@ export default function TaskDetail({
                                 : taskDetails.assignedTo
                             : "Not Assigned"}
                     </p>
+
+                    {/* Comments Section */}
+                    <div style={{ marginTop: "24px", borderTop: "1px solid #f0f0f0", paddingTop: "16px" }}>
+                        <h3 style={{ marginBottom: "16px", fontSize: "16px", fontWeight: "600" }}>Comments</h3>
+
+                        {/* Comments List */}
+                        <div
+                            style={{
+                                maxHeight: "200px",
+                                overflowY: "auto",
+                                marginBottom: "16px",
+                                padding: "8px",
+                                backgroundColor: "#fafafa",
+                                borderRadius: "4px",
+                                minHeight: "100px",
+                            }}
+                        >
+                            {taskDetails.comments && taskDetails.comments.length > 0 ? (
+                                <div>
+                                    {taskDetails.comments.map((comment: any, index: number) => (
+                                        <div
+                                            key={index}
+                                            style={{
+                                                padding: "12px",
+                                                marginBottom: "8px",
+                                                backgroundColor: "white",
+                                                borderLeft: "3px solid #1890ff",
+                                                borderRadius: "2px",
+                                                fontSize: "14px",
+                                                lineHeight: "1.5",
+                                            }}
+                                        >
+                                            <div style={{ marginBottom: "6px" }}>
+                                                <strong style={{ color: "#0066cc" }}>
+                                                    {typeof comment === 'object' && comment.userId
+                                                        ? (typeof comment.userId === 'object' ? comment.userId.name : "Unknown User")
+                                                        : "Anonymous"}
+                                                </strong>
+                                                {typeof comment === 'object' && comment.createdAt && (
+                                                    <span style={{ color: "#999", fontSize: "12px", marginLeft: "8px" }}>
+                                                        {new Date(comment.createdAt).toLocaleString()}
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div>
+                                                {typeof comment === 'object' ? comment.text : comment}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p style={{ color: "#999", textAlign: "center", padding: "32px 0" }}>
+                                    No comments yet. Add one to get started!
+                                </p>
+                            )}
+                        </div>
+
+                        {/* Add Comment */}
+                        <Space.Compact style={{ width: "100%", display: "flex", gap: "8px" }}>
+                            <Input
+                                placeholder="Add a comment..."
+                                value={newComment}
+                                onChange={(e) => setNewComment(e.target.value)}
+                                onPressEnter={handleAddComment}
+                                disabled={addingComment}
+                                style={{ flex: 1 }}
+                            />
+                            <Button
+                                type="primary"
+                                icon={<SendOutlined />}
+                                onClick={handleAddComment}
+                                loading={addingComment}
+                            >
+                                Send
+                            </Button>
+                        </Space.Compact>
+                    </div>
                 </div>
             )}
         </Modal>

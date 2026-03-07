@@ -48,6 +48,19 @@ export const updateTask = async (taskId: String, task: Task) => {
     }
 };
 
+export const addComment = async (taskId: String, text: string, userId: string) => {
+    try {
+        const response = await API.put(`/taskIt/tasks/comments/${taskId}`, {
+            text,
+            userId
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Failed to add comment:", error);
+        throw error;
+    }
+};
+
 export const deleteTask = async (taskId: String) => {
     try {
         const response = await API.delete(`/taskIt/tasks/delete/${taskId}`);
