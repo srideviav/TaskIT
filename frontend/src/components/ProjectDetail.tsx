@@ -3,11 +3,12 @@
 import React, { useContext, useState } from "react";
 import { getAllTasks, createTask } from "../services/tasks.service";
 import { AuthContext } from "../context/authContext";
-import { Button, Modal, Form, Input, message, Space, Empty } from "antd";
+import { Button, Modal, Form, Input, message, Space, Empty, Select, Pagination } from "antd";
 import { PlusOutlined, ArrowLeftOutlined } from "@ant-design/icons";
 import TaskDetail from "./TaskDetail";
 import { initSocket, joinProject } from "../lib/socket";
 import { useTaskSocket } from "../hooks/useSocket";
+import { getAllUsers } from "../services/auth.service";
 
 interface Project {
     _id: string;
@@ -21,16 +22,41 @@ interface ProjectDetailProps {
     onBack: () => void;
 }
 
+interface IUser {
+    _id: string;
+    name: string;
+}
+
 export default function ProjectDetail({ project, onBack }: ProjectDetailProps) {
     const [tasks, setTasks] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedTask, setSelectedTask] = useState<any>(null);
     const [isTaskDetailOpen, setIsTaskDetailOpen] = useState(false);
+    const [users, setUsers] = useState<IUser[]>([]);
     const [form] = Form.useForm();
     const auth = useContext(AuthContext);
+    const [searchValue, setSearchValue] = useState("");
+    const [statusFilter, setStatusFilter] = useState<string | undefined>(undefined);
+    const [assigneeFilter, setAssigneeFilter] = useState<string | undefined>(undefined);
+    const [currentPage, setCurrentPage] = useState(1);
+    const pageSize = 5;
 
     const userId = auth?.user?._id?.toString();
+
+    const statusOptions = [
+        { label: "To Do", value: "To Do" },
+        { label: "In Progress", value: "In Progress" },
+        { label: "Done", value: "Done" },
+    ];
+    const loadUsers = async () => {
+        try {
+            const userList: IUser[] = await getAllUsers();
+            setUsers(userList);
+        } catch (error) {
+            console.error("Failed to load users:", error);
+        }
+    };
 
     const handleTaskCreated = (newTask: any) => {
         if (newTask.projectId === project._id) {
@@ -59,6 +85,7 @@ export default function ProjectDetail({ project, onBack }: ProjectDetailProps) {
 
     React.useEffect(() => {
         fetchTasks();
+        loadUsers();
         // Initialize socket connection
         const socket = initSocket();
         if (socket) {
@@ -141,13 +168,18 @@ export default function ProjectDetail({ project, onBack }: ProjectDetailProps) {
             </Space>
 
             <div style={{ marginBottom: "20px" }}>
-                <h1 className="text-2xl font-semibold mb-2">{project.name}</h1>
-                <p className="text-gray-600">{project.description}</p>
-                {project.members && project.members.length > 0 && (
-                    <p className="text-sm text-gray-500 mt-2">
-                        <strong>Members:</strong> {project.members.join(", ")}
-                    </p>
-                )}
+                <h1 className="text-2xl font-semibold mb-2">
+                    {project.name}
+                </h1>
+                <p className="text-gray-600">
+                    <strong>Project Description:</strong>{" "}{project.description}</p>
+                <p>
+                    <strong>Members:</strong>{" "}
+                    {project.members && project.members.length > 0
+                        ? project.members.map((m: any) => m.name).join(", ")
+                        : "No members"}
+                </p>
+
             </div>
 
             <Button
@@ -192,8 +224,27 @@ export default function ProjectDetail({ project, onBack }: ProjectDetailProps) {
                     <Form.Item
                         label="Status"
                         name="status"
+                        rules={[{ required: true, message: "Please select status" }]}
                     >
-                        <Input placeholder="e.g., To Do, In Progress, Done" />
+                        <Select
+                            placeholder="Select status"
+                            options={statusOptions}
+                        />
+                    </Form.Item>
+
+                    <Form.Item
+                        label="Assignee"
+                        name="assignedTo"
+                    >
+                        <Select
+                            placeholder="Search and select assignee"
+                            allowClear
+                            showSearch
+                            options={users.map((user) => ({
+                                label: user.name,
+                                value: user._id,
+                            }))}
+                        />
                     </Form.Item>
 
                     <Form.Item>
@@ -211,52 +262,145 @@ export default function ProjectDetail({ project, onBack }: ProjectDetailProps) {
 
             <div>
                 <h2 className="text-xl font-semibold mb-4">Tasks</h2>
+                
+                <Space style={{ marginBottom: "20px", width: "100%", display: "flex", gap: "10px", flexWrap: "wrap" }}>
+                    <Input
+                        placeholder="Search tasks by title..."
+                        value={searchValue}
+                        onChange={(e) => {
+                            setSearchValue(e.target.value);
+                            setCurrentPage(1);
+                        }}
+                        style={{ width: "200px" }}
+                        allowClear
+                    />
+                    
+                    <Select
+                        placeholder="Filter by status"
+                        style={{ width: "150px" }}
+                        value={statusFilter || "all"}
+                        onChange={(value) => {
+                            setStatusFilter(value === "all" ? undefined : value);
+                            setCurrentPage(1);
+                        }}
+                        options={[
+                            { label: "All Status", value: "all" },
+                            { label: "To Do", value: "To Do" },
+                            { label: "In Progress", value: "In Progress" },
+                            { label: "Done", value: "Done" },
+                        ]}
+                        allowClear
+                    />
+                    
+                    <Select
+                        placeholder="Filter by assignee"
+                        style={{ width: "180px" }}
+                        value={assigneeFilter}
+                        onChange={(value) => {
+                            setAssigneeFilter(value);
+                            setCurrentPage(1);
+                        }}
+                        options={[
+                            { label: "All Assignees", value: undefined },
+                            ...users.map((user) => ({
+                                label: user.name,
+                                value: user._id,
+                            })),
+                        ]}
+                        allowClear
+                    />
+                </Space>
+
                 {tasks.length === 0 ? (
                     <Empty description="No tasks found. Create one to get started!" />
-                ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-                        {tasks.map((task) => (
-                            <div
-                                key={task._id}
-                                onClick={() => handleTaskClick(task)}
-                                style={{
-                                    padding: "12px 16px",
-                                    border: "1px solid #f0f0f0",
-                                    borderRadius: "6px",
-                                    cursor: "pointer",
-                                    display: "flex",
-                                    justifyContent: "space-between",
-                                    alignItems: "center",
-                                    transition: "all 0.3s",
-                                }}
-                                onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#1890ff")}
-                                onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#f0f0f0")}
-                            >
-                                <div style={{ flex: 1 }}>
-                                    <p style={{ margin: "0 0 4px 0", fontWeight: "500" }}>
-                                        {task.title}
-                                    </p>
-                                    <p style={{ margin: 0, color: "#666", fontSize: "12px" }}>
-                                        {task.description}
-                                    </p>
-                                </div>
-                                <div
-                                    style={{
-                                        padding: "4px 12px",
-                                        backgroundColor: getStatusColor(task.status),
-                                        borderRadius: "4px",
-                                        color: "white",
-                                        fontSize: "12px",
-                                        marginLeft: "12px",
-                                        whiteSpace: "nowrap",
-                                    }}
-                                >
-                                    {task.status || "No Status"}
-                                </div>
+                ) : (() => {
+                    // Filter tasks based on search and filter criteria
+                    const filteredTasks = tasks.filter((task) => {
+                        const matchesSearch = task.title.toLowerCase().includes(searchValue.toLowerCase());
+                        const matchesStatus = !statusFilter || task.status === statusFilter;
+                        const matchesAssignee = !assigneeFilter || 
+                            (typeof task.assignedTo === 'object' ? task.assignedTo._id : task.assignedTo) === assigneeFilter;
+                        return matchesSearch && matchesStatus && matchesAssignee;
+                    });
+
+                    if (filteredTasks.length === 0) {
+                        return <Empty description="No tasks match your filters." />;
+                    }
+
+                    // Calculate pagination
+                    const totalTasks = filteredTasks.length;
+                    const startIndex = (currentPage - 1) * pageSize;
+                    const endIndex = startIndex + pageSize;
+                    const paginatedTasks = filteredTasks.slice(startIndex, endIndex);
+
+                    return (
+                        <>
+                            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                                {paginatedTasks.map((task) => (
+                                    <div
+                                        key={task._id}
+                                        onClick={() => handleTaskClick(task)}
+                                        style={{
+                                            padding: "12px 16px",
+                                            border: "1px solid #f0f0f0",
+                                            borderRadius: "6px",
+                                            cursor: "pointer",
+                                            display: "flex",
+                                            justifyContent: "space-between",
+                                            alignItems: "center",
+                                            transition: "all 0.3s",
+                                        }}
+                                        onMouseEnter={(e) => (e.currentTarget.style.borderColor = "#1890ff")}
+                                        onMouseLeave={(e) => (e.currentTarget.style.borderColor = "#f0f0f0")}
+                                    >
+                                        <div style={{ flex: 1 }}>
+                                            <p style={{ margin: "0 0 4px 0", fontWeight: "500" }}>
+                                                {task.title}
+                                            </p>
+                                            <p style={{ margin: 0, color: "#666", fontSize: "12px" }}>
+                                                {task.description}
+                                            </p>
+                                        </div>
+                                        <div
+                                            style={{
+                                                padding: "4px 12px",
+                                                backgroundColor: "#f5f5f5",
+                                                borderRadius: "4px",
+                                                color: "#333",
+                                                fontSize: "12px",
+                                                marginLeft: "12px",
+                                                whiteSpace: "nowrap",
+                                                border: "1px solid #d9d9d9",
+                                            }}
+                                        >
+                                           <>Assignee: </> {typeof task.assignedTo === 'object' ? task.assignedTo.name : (task.assignedTo ? "Assigned" : "Unassigned")}
+                                        </div>
+                                        <div
+                                            style={{
+                                                padding: "4px 12px",
+                                                backgroundColor: getStatusColor(task.status),
+                                                borderRadius: "4px",
+                                                color: "white",
+                                                fontSize: "12px",
+                                                marginLeft: "12px",
+                                                whiteSpace: "nowrap",
+                                            }}
+                                        >
+                                            {task.status || "No Status"}
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
-                        ))}
-                    </div>
-                )}
+                            <Pagination
+                                current={currentPage}
+                                pageSize={pageSize}
+                                total={totalTasks}
+                                onChange={(page) => setCurrentPage(page)}
+                                style={{ marginTop: "20px", textAlign: "center" }}
+                            />
+                        </>
+                    );
+                })()}
             </div>
 
             {selectedTask && (

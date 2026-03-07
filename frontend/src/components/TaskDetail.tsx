@@ -228,12 +228,6 @@ export default function TaskDetail({
                             placeholder="Search and select assignee"
                             allowClear
                             showSearch
-                            optionFilterProp="label"
-                            filterOption={(input, option) =>
-                                (option?.label as string)
-                                    .toLowerCase()
-                                    .includes(input.toLowerCase())
-                            }
                             options={users.map((user) => ({
                                 label: user.name,
                                 value: user._id,

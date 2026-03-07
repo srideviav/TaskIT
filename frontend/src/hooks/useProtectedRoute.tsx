@@ -4,14 +4,16 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "./useAuth";
 
 export const useProtectedRoute = () => {
-    const { user } = useAuth();
+    const { user, loading } = useAuth();
     const router = useRouter();
-    console.log("ussssssssss",user)
-    const token = user?.token;
-    console.log("tooooooooooooooo",token)
+
     useEffect(() => {
-        if (!token ) {
+        // Wait for auth to finish loading from localStorage
+        if (loading) return;
+        
+        // If no user after loading, redirect to login
+        if (!user || !user.token) {
             router.push("/login");
         }
-    }, [token, router]);
+    }, [loading, user, router]);
 }

@@ -8,43 +8,81 @@ export default function Navbar() {
   const { user, logout } = useAuth();
 
   return (
-    <div className="flex justify-between items-center px-6 py-4 bg-blue-900 text-white">
+    <div style={{
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "center",
+      padding: "16px 24px",
+      backgroundColor: "#0066cc",
+      color: "white"
+    }}>
 
-      {/* Logo */}
-      <h1 className="text-xl font-bold">
+      {/* Logo - Left */}
+      <h1 style={{
+        fontSize: "24px",
+        fontWeight: "bold",
+        margin: 0,
+        color: "white"
+      }}>
         TaskIt
       </h1>
 
-      {/* Right Section */}
-      <div className="flex items-center gap-4">
+      {/* Welcome Message - Center */}
+      <div style={{
+        flex: 1,
+        textAlign: "center",
+        color: "white"
+      }}>
+        {user && (
+          <span style={{ color: "white", fontSize: "16px" }}>
+            Welcome, {user.name}
+          </span>
+        )}
+      </div>
 
+      {/* Buttons - Right */}
+      <div style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "16px"
+      }}>
         {user ? (
-          <>
-            <span>Welcome, {user.name}</span>
-
-            <Button
-              className="!bg-white !text-black !border-none hover:!bg-gray-200"
-              onClick={logout}
-            >
-              Logout
-            </Button>
-          </>
+          <Button
+            style={{
+              backgroundColor: "white",
+              color: "#0066cc",
+              border: "none",
+              fontWeight: "600"
+            }}
+            onClick={logout}
+          >
+            Logout
+          </Button>
         ) : (
           <>
             <Link href="/login">
-              <Button className="!bg-white !text-black !border-none hover:!bg-gray-200">
+              <Button style={{
+                backgroundColor: "white",
+                color: "#0066cc",
+                border: "none",
+                fontWeight: "600"
+              }}>
                 Login
               </Button>
             </Link>
 
             <Link href="/register">
-              <Button className="!bg-white !text-black !border-none hover:!bg-gray-200">
+              <Button style={{
+                backgroundColor: "white",
+                color: "#0066cc",
+                border: "none",
+                fontWeight: "600"
+              }}>
                 Register
               </Button>
             </Link>
           </>
         )}
-
       </div>
     </div>
   );

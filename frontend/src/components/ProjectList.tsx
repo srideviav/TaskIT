@@ -4,7 +4,7 @@ import React, { useContext } from "react";
 import { getAllProjects, createProject, updateProject, deleteProject } from "../services/projects.service";
 import { getAllUsers } from "../services/auth.service";
 import { AuthContext } from "../context/authContext";
-import { Button, Modal, Form, Select, Input, message, Collapse, Space, Popconfirm } from "antd";
+import { Button, Modal, Form, Select, Input, message, Collapse, Space, Popconfirm, Pagination } from "antd";
 import { EditOutlined, DeleteOutlined, FolderOpenOutlined } from "@ant-design/icons";
 import ProjectDetail from "./ProjectDetail";
 
@@ -17,6 +17,9 @@ export default function ProjectList() {
     const [users, setUsers] = React.useState<any[]>([]);
     const [form] = Form.useForm();
     const auth = useContext(AuthContext);
+    const [searchValue, setSearchValue] = React.useState("");
+    const [currentPage, setCurrentPage] = React.useState(1);
+    const pageSize = 5;
 
     const userId = auth?.user?._id?.toString();
 
@@ -136,7 +139,18 @@ export default function ProjectList() {
         );
     }
 
-    const collapsedItems = projects.map((project: any) => ({
+    // Filter projects based on search value
+    const filteredProjects = projects.filter((project: any) =>
+        project.name.toLowerCase().includes(searchValue.toLowerCase())
+    );
+
+    // Calculate pagination
+    const totalProjects = filteredProjects.length;
+    const startIndex = (currentPage - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const paginatedProjects = filteredProjects.slice(startIndex, endIndex);
+
+    const collapsedItems = paginatedProjects.map((project: any) => ({
         key: project._id,
         label: project.name,
         children: (
@@ -192,6 +206,17 @@ export default function ProjectList() {
                 Create Project
             </Button>
 
+            <Input
+                placeholder="Search projects by name..."
+                value={searchValue}
+                onChange={(e) => {
+                    setSearchValue(e.target.value);
+                    setCurrentPage(1);
+                }}
+                style={{ marginBottom: "20px" }}
+                allowClear
+            />
+
             <Modal
                 title={editingProject ? "Edit Project" : "Create New Project"}
                 open={isModalOpen}
@@ -245,8 +270,19 @@ export default function ProjectList() {
 
             {projects.length === 0 ? (
                 <p>No projects found</p>
+            ) : filteredProjects.length === 0 ? (
+                <p>No projects match your search criteria.</p>
             ) : (
-                <Collapse items={collapsedItems} />
+                <>
+                    <Collapse items={collapsedItems} />
+                    <Pagination
+                        current={currentPage}
+                        pageSize={pageSize}
+                        total={totalProjects}
+                        onChange={(page) => setCurrentPage(page)}
+                        style={{ marginTop: "20px", textAlign: "center" }}
+                    />
+                </>
             )}
         </div>
     );

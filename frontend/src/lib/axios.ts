@@ -6,7 +6,7 @@ const API = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
-  withCredentials: true,
+  // withCredentials: true,
 });
 
 const PUBLIC_ENDPOINTS = ["/taskit/users/login", "/taskit/users/register"];
