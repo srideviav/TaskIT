@@ -1,73 +1,71 @@
-import { useEffect, useState } from "react";
-import { 
-    initSocket, 
-    getSocket, 
-    joinProject as joinProjectSocket,
-    onTaskCreated,
-    onTaskUpdated,
-    onTaskDeleted,
-    offTaskCreated,
-    offTaskUpdated,
-    offTaskDeleted,
-} from "../lib/socket";
-import { Socket } from "socket.io-client";
+"use client";
 
-export const useSocket = () => {
-    const [socket, setSocket] = useState<Socket | null>(null);
-    const [isConnected, setIsConnected] = useState(false);
+import { useEffect, useState, useRef } from "react";
+import { connectSocket, getSocket } from "../lib/socket";
+
+interface Member {
+    userId: string;
+    name: string;
+}
+
+const useSocket = (projectId: {projectId:string}, token: string) => {
+
+    const [activeMembers, setActiveMembers] = useState<Member[]>([]);
+    const hasJoinedRef = useRef<string | null>(null);
+    const socketRef = useRef<any>(null);
+
+    console.log("projectId :", projectId.projectId)
 
     useEffect(() => {
-        const socketInstance = initSocket();
-        setSocket(socketInstance);
+        if(!projectId?.projectId || !token) return;
 
-        if (socketInstance) {
-            const handleConnect = () => setIsConnected(true);
-            const handleDisconnect = () => setIsConnected(false);
-
-            socketInstance.on("connect", handleConnect);
-            socketInstance.on("disconnect", handleDisconnect);
-
-            if (socketInstance.connected) {
-                setIsConnected(true);
-            }
-
-            return () => {
-                socketInstance.off("connect", handleConnect);
-                socketInstance.off("disconnect", handleDisconnect);
-            };
-        }
-    }, []);
-
-    const joinProject = (projectId: string) => {
-        if (socket?.connected) {
-            joinProjectSocket(projectId);
-        }
-    };
-
-    return { socket, isConnected, joinProject };
-};
-
-export const useTaskSocket = (onTaskCreatedCallback?: (task: any) => void, onTaskUpdatedCallback?: (task: any) => void, onTaskDeletedCallback?: (task: any) => void) => {
-    useEffect(() => {
-        initSocket();
+        socketRef.current = connectSocket(token);
+        const socket = socketRef.current;
         
-        if (onTaskCreatedCallback) {
-            onTaskCreated(onTaskCreatedCallback);
-            return () => offTaskCreated(onTaskCreatedCallback);
-        }
-    }, [onTaskCreatedCallback]);
+        const handleActiveMember = (members: Member[]) => {
+            console.log("active members received:", members);
+            setActiveMembers(members);
+        };
 
-    useEffect(() => {
-        if (onTaskUpdatedCallback) {
-            onTaskUpdated(onTaskUpdatedCallback);
-            return () => offTaskUpdated(onTaskUpdatedCallback);
-        }
-    }, [onTaskUpdatedCallback]);
+        // Add listener
+        socket.on("activeMember", handleActiveMember);
 
-    useEffect(() => {
-        if (onTaskDeletedCallback) {
-            onTaskDeleted(onTaskDeletedCallback);
-            return () => offTaskDeleted(onTaskDeletedCallback);
+        const joinProject = () => {
+            console.log("Attempting to join project:", projectId.projectId);
+            socket.emit("joinProject", projectId.projectId, token);
+            hasJoinedRef.current = projectId.projectId;
+        };
+
+        // Join if we haven't joined this project OR if we need to rejoin
+        if(hasJoinedRef.current !== projectId.projectId){
+            if(socket.connected){
+                joinProject();
+            } else {
+                // Wait for connection
+                const onConnect = () => {
+                    joinProject();
+                    socket.off("connect", onConnect);
+                };
+                socket.on("connect", onConnect);
+            }
         }
-    }, [onTaskDeletedCallback]);
-};
+        
+        return () => {
+            // Only leave the project, don't disconnect the socket
+            if(hasJoinedRef.current === projectId.projectId){
+                try {
+                    socket.emit("leaveProject", projectId.projectId);
+                    console.log("left the project:", projectId.projectId);
+                    socket.off("activeMember", handleActiveMember);
+                    hasJoinedRef.current = null;
+                } catch(err) {
+                    console.error("Error leaving project:", err);
+                }
+            }
+        }
+    }, [projectId.projectId, token]);
+    
+    return{activeMembers};
+}
+
+export default useSocket;

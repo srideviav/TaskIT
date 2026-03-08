@@ -6,6 +6,7 @@ import { EditOutlined, DeleteOutlined, SendOutlined } from "@ant-design/icons";
 import { updateTask, deleteTask, getTask, addComment } from "../services/tasks.service";
 import { getAllUsers } from "../services/auth.service";
 import { AuthContext } from "../context/authContext";
+import { getSocket } from "../lib/socket";
 
 interface IUser {
     _id: string;
@@ -34,11 +35,12 @@ interface TaskDetailModalProps {
     task: Task;
     onClose: () => void;
     onTaskUpdated: () => void;
+    initialTasks: any;
 }
 
 const getAssignedUserId = (assignedTo?: string | IUser) => {
-  if (!assignedTo) return undefined;
-  return typeof assignedTo === "object" ? assignedTo._id : assignedTo;
+    if (!assignedTo) return undefined;
+    return typeof assignedTo === "object" ? assignedTo._id : assignedTo;
 };
 
 export default function TaskDetail({
@@ -46,6 +48,7 @@ export default function TaskDetail({
     task,
     onClose,
     onTaskUpdated,
+    initialTasks
 }: TaskDetailModalProps) {
     const [isEditing, setIsEditing] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -55,7 +58,6 @@ export default function TaskDetail({
     const [newComment, setNewComment] = useState("");
     const [addingComment, setAddingComment] = useState(false);
     const auth = useContext(AuthContext);
-    
 
     React.useEffect(() => {
         if (open && task._id) {
@@ -64,7 +66,60 @@ export default function TaskDetail({
         }
     }, [open, task]);
 
-        const userId = auth?.user?._id?.toString();
+    // Helper function to extract projectId from task object
+    const getProjectId = (projectId?: string | { _id: string }): string | undefined => {
+        if (!projectId) return undefined;
+        return typeof projectId === 'object' ? projectId._id : projectId;
+    };
+
+    const handleTaskUpdated = (updatedTask: any) => {
+        console.log("Received taskUpdated event:", updatedTask);
+        const taskProjectId = getProjectId(updatedTask.projectId);
+        const currentProjectId = getProjectId(taskDetails.projectId);
+
+        if (taskProjectId && currentProjectId && taskProjectId === currentProjectId) {
+            // Update the task details if it's the current task
+            if (updatedTask._id === taskDetails._id) {
+                setTaskDetails(updatedTask);
+                message.info("Task updated by team member!");
+            }
+        }
+    };
+
+    const handleTaskDeleted = (deletedTask: any) => {
+        console.log("Received taskDeleted event:", deletedTask);
+        const taskProjectId = getProjectId(deletedTask.projectId);
+        const currentProjectId = getProjectId(taskDetails.projectId);
+
+        if (taskProjectId && currentProjectId && taskProjectId === currentProjectId) {
+            // Close the modal if the current task was deleted
+            if (deletedTask._id === taskDetails._id) {
+                message.info("This task was deleted by team member.");
+                onClose();
+            }
+        }
+    };
+
+    React.useEffect(() => {
+        // Only register listeners if we have a valid projectId
+        if (!taskDetails?.projectId) return;
+
+        try {
+            const socket = getSocket();
+
+            socket.on("taskUpdatedFE", handleTaskUpdated);
+            socket.on("taskDeletedFE", handleTaskDeleted);
+
+            return () => {
+                socket.off("taskUpdatedFE", handleTaskUpdated);
+                socket.off("taskDeletedFE", handleTaskDeleted);
+            };
+        } catch (err) {
+            console.error("Socket not connected for task listeners:", err);
+        }
+    }, [taskDetails.projectId]);
+
+    const userId = auth?.user?._id?.toString();
 
     const fetchTaskDetails = async () => {
         try {
@@ -122,8 +177,19 @@ export default function TaskDetail({
     const handleDelete = async () => {
         try {
             setLoading(true);
+            const taskToDelete = { ...taskDetails };
             await deleteTask(task._id);
             message.success("Task deleted successfully!");
+
+            // Emit socket event to notify other browsers
+            try {
+                const socket = getSocket();
+                console.log("Emitting taskDeletedFE for task:", taskToDelete._id);
+                socket.emit("taskDeletedFE", taskToDelete);
+            } catch (err) {
+                console.error("Failed to emit task deletion:", err);
+            }
+
             onClose();
             onTaskUpdated();
         } catch (error) {
@@ -135,10 +201,8 @@ export default function TaskDetail({
     };
 
     const handleSubmit = async (values: any) => {
+        setLoading(true);
         try {
-            setLoading(true);
-            // Extract assignedTo ID if it's an object, otherwise use as-is
-            console.log("comments:",taskDetails)
             const assignedToId = values.assignedTo
                 ? (typeof values.assignedTo === 'object' ? values.assignedTo._id : values.assignedTo)
                 : undefined;
@@ -147,11 +211,23 @@ export default function TaskDetail({
                 description: values.description,
                 status: values.status,
                 assignedTo: assignedToId,
-                // comments: taskDetails.comments || [],
             };
-            await updateTask(task._id, updateData);
+            const updatedTask = await updateTask(task._id, updateData);
             message.success("Task updated successfully!");
             setIsEditing(false);
+            console.log("up:0", updatedTask.data._id)
+            const getChanges = await getTask(updatedTask.data._id);
+            setTaskDetails(getChanges);
+
+            // Emit socket event to notify other browsers
+            try {
+                const socket = getSocket();
+                console.log("taskUpdatedFE:", getChanges._id);
+                socket.emit("taskUpdatedFE", getChanges);
+            } catch (err) {
+                console.error("Failed to emit task update:", err);
+            }
+
             onTaskUpdated();
         } catch (error) {
             console.error("Failed to update task:", error);
@@ -168,13 +244,13 @@ export default function TaskDetail({
         }
 
         try {
-            setAddingComment(true);   
-            if(!userId) return null ;         
+            setAddingComment(true);
+            if (!userId) return null;
             await addComment(task._id, newComment, userId);
-            
+
             const updatedTask = await getTask(task._id);
             setTaskDetails(updatedTask);
-            
+
             setNewComment("");
             message.success("Comment added successfully!");
         } catch (error) {
@@ -186,6 +262,7 @@ export default function TaskDetail({
     };
 
     return (
+
         <Modal
             title={isEditing ? "Edit Task" : "Task Details"}
             open={open}

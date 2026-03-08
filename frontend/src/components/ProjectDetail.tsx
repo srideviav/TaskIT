@@ -1,14 +1,15 @@
 "use client";
 
 import React, { useContext, useState } from "react";
-import { getAllTasks, createTask } from "../services/tasks.service";
+import { getAllTasks, createTask, getTask } from "../services/tasks.service";
 import { AuthContext } from "../context/authContext";
 import { Button, Modal, Form, Input, message, Space, Empty, Select, Pagination } from "antd";
 import { PlusOutlined, ArrowLeftOutlined } from "@ant-design/icons";
 import TaskDetail from "./TaskDetail";
-import { initSocket, joinProject } from "../lib/socket";
-import { useTaskSocket } from "../hooks/useSocket";
 import { getAllUsers } from "../services/auth.service";
+import ProjectsPage from "../app/projects/page";
+import useSocket from "../hooks/useSocket";
+import { getSocket } from "../lib/socket";
 
 interface Project {
     _id: string;
@@ -41,14 +42,19 @@ export default function ProjectDetail({ project, onBack }: ProjectDetailProps) {
     const [assigneeFilter, setAssigneeFilter] = useState<string | undefined>(undefined);
     const [currentPage, setCurrentPage] = useState(1);
     const pageSize = 5;
-
     const userId = auth?.user?._id?.toString();
+    const token = auth?.user?.token?.toString();
+    const { activeMembers } = useSocket({ projectId: project._id }, token || "");
+
+
+    console.log("ACtive mebers:", activeMembers)
 
     const statusOptions = [
         { label: "To Do", value: "To Do" },
         { label: "In Progress", value: "In Progress" },
         { label: "Done", value: "Done" },
     ];
+
     const loadUsers = async () => {
         try {
             const userList: IUser[] = await getAllUsers();
@@ -59,37 +65,25 @@ export default function ProjectDetail({ project, onBack }: ProjectDetailProps) {
     };
 
     const handleTaskCreated = (newTask: any) => {
-        if (newTask.projectId === project._id) {
+        console.log("Received taskCreated event:", newTask);
+        if (newTask.projectId === project._id || newTask.projectId?._id === project._id) {
             setTasks((prev) => [newTask, ...prev]);
             message.success("New task created by team member!");
         }
     };
 
-    const handleTaskUpdated = (updatedTask: any) => {
-        if (updatedTask.projectId === project._id) {
-            setTasks((prev) =>
-                prev.map((task) => (task._id === updatedTask._id ? updatedTask : task))
-            );
-        }
-    };
-
-    const handleTaskDeleted = (deletedTask: any) => {
-        if (deletedTask.projectId === project._id) {
-            setTasks((prev) => prev.filter((task) => task._id !== deletedTask._id));
-            message.info("A task was deleted by team member.");
-        }
-    };
-
-    // Setup task socket listeners
-    useTaskSocket(handleTaskCreated, handleTaskUpdated, handleTaskDeleted);
-
+ 
     React.useEffect(() => {
         fetchTasks();
         loadUsers();
-        // Initialize socket connection
-        const socket = initSocket();
-        if (socket) {
-            joinProject(project._id);
+        try {
+            const socket = getSocket();
+            socket.on("taskCreatedFE", handleTaskCreated);
+            return () => {
+                socket.off("taskCreatedFE", handleTaskCreated);
+            };
+        } catch (err) {
+            console.error("Socket not connected for task listeners:", err);
         }
     }, [project._id]);
 
@@ -131,10 +125,22 @@ export default function ProjectDetail({ project, onBack }: ProjectDetailProps) {
                 status: values.status || "To Do",
                 assignedTo: values.assignedTo || userId,
             };
-            await createTask(taskData);
+            const createdTask = await createTask(taskData);
             message.success("Task created successfully!");
             setIsModalOpen(false);
             form.resetFields();
+
+            const getChanges = await getTask(createdTask.data._id);
+
+            // Emit socket event to notify other browsers
+            try {
+                const socket = getSocket();
+                console.log("taskCreatedFE:", getChanges._id);
+                socket.emit("taskCreatedFE", getChanges);
+            } catch (err) {
+                console.error("Failed to emit task creation:", err);
+            }
+
             fetchTasks();
         } catch (error) {
             console.error("Failed to create task:", error);
@@ -162,7 +168,7 @@ export default function ProjectDetail({ project, onBack }: ProjectDetailProps) {
                     {project.name}
                 </h1>
                 <p className="text-gray-600">
-                     {project.description}</p>
+                    {project.description}</p>
                 <p>
                     <strong>Members:</strong>{" "}
                     {project.members && project.members.length > 0
@@ -183,7 +189,7 @@ export default function ProjectDetail({ project, onBack }: ProjectDetailProps) {
                 >
                     Back to Projects
                 </Button>
-                
+
                 <Button
                     icon={<PlusOutlined />}
                     onClick={handleCreateClick}
@@ -195,52 +201,52 @@ export default function ProjectDetail({ project, onBack }: ProjectDetailProps) {
                 >
                     Create New Task
                 </Button>
-                     <Input
-                        placeholder="Search tasks by title..."
-                        value={searchValue}
-                        onChange={(e) => {
-                            setSearchValue(e.target.value);
-                            setCurrentPage(1);
-                        }}
-                        style={{ width: "200px" }}
-                        allowClear
-                    />
-                    
-                    <Select
-                        placeholder="Filter by status"
-                        style={{ width: "150px" }}
-                        value={statusFilter || "all"}
-                        onChange={(value) => {
-                            setStatusFilter(value === "all" ? undefined : value);
-                            setCurrentPage(1);
-                        }}
-                        options={[
-                            { label: "All Status", value: "all" },
-                            { label: "To Do", value: "To Do" },
-                            { label: "In Progress", value: "In Progress" },
-                            { label: "Done", value: "Done" },
-                        ]}
-                        allowClear
-                    />
-                    
-                    <Select
-                        placeholder="Filter by assignee"
-                        style={{ width: "180px" }}
-                        value={assigneeFilter}
-                        onChange={(value) => {
-                            setAssigneeFilter(value);
-                            setCurrentPage(1);
-                        }}
-                        options={[
-                            { label: "All Assignees", value: undefined },
-                            ...users.map((user) => ({
-                                label: user.name,
-                                value: user._id,
-                            })),
-                        ]}
-                        allowClear
-                    />
-                 
+                <Input
+                    placeholder="Search tasks by title..."
+                    value={searchValue}
+                    onChange={(e) => {
+                        setSearchValue(e.target.value);
+                        setCurrentPage(1);
+                    }}
+                    style={{ width: "200px" }}
+                    allowClear
+                />
+
+                <Select
+                    placeholder="Filter by status"
+                    style={{ width: "150px" }}
+                    value={statusFilter || "all"}
+                    onChange={(value) => {
+                        setStatusFilter(value === "all" ? undefined : value);
+                        setCurrentPage(1);
+                    }}
+                    options={[
+                        { label: "All Status", value: "all" },
+                        { label: "To Do", value: "To Do" },
+                        { label: "In Progress", value: "In Progress" },
+                        { label: "Done", value: "Done" },
+                    ]}
+                    allowClear
+                />
+
+                <Select
+                    placeholder="Filter by assignee"
+                    style={{ width: "180px" }}
+                    value={assigneeFilter}
+                    onChange={(value) => {
+                        setAssigneeFilter(value);
+                        setCurrentPage(1);
+                    }}
+                    options={[
+                        { label: "All Assignees", value: undefined },
+                        ...users.map((user) => ({
+                            label: user.name,
+                            value: user._id,
+                        })),
+                    ]}
+                    allowClear
+                />
+
             </Space>
 
             <Modal
@@ -320,7 +326,7 @@ export default function ProjectDetail({ project, onBack }: ProjectDetailProps) {
                     const filteredTasks = tasks.filter((task) => {
                         const matchesSearch = task.title.toLowerCase().includes(searchValue.toLowerCase());
                         const matchesStatus = !statusFilter || task.status === statusFilter;
-                        const matchesAssignee = !assigneeFilter || 
+                        const matchesAssignee = !assigneeFilter ||
                             (typeof task.assignedTo === 'object' ? task.assignedTo._id : task.assignedTo) === assigneeFilter;
                         return matchesSearch && matchesStatus && matchesAssignee;
                     });
@@ -375,7 +381,7 @@ export default function ProjectDetail({ project, onBack }: ProjectDetailProps) {
                                                 border: "1px solid #d9d9d9",
                                             }}
                                         >
-                                           <>Assignee: </> {typeof task.assignedTo === 'object' ? task.assignedTo.name : (task.assignedTo ? "Assigned" : "Unassigned")}
+                                            <>Assignee: </> {typeof task.assignedTo === 'object' ? task.assignedTo.name : (task.assignedTo ? "Assigned" : "Unassigned")}
                                         </div>
                                         <div
                                             style={{
@@ -413,6 +419,13 @@ export default function ProjectDetail({ project, onBack }: ProjectDetailProps) {
                     onTaskUpdated={handleTaskDetailsUpdated}
                 />
             )}
+
+            {project._id && (
+                <ProjectsPage
+                    projectId={project._id}
+                />
+            )}
+
         </div>
     );
 }
