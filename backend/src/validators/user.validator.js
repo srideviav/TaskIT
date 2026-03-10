@@ -31,8 +31,5 @@ exports.loginSchema = z.object({
     password: z.string({
       required_error: "Password is required"
     })
-    .min(8, { message: "Password must be at least 8 characters long" })
-    .regex(/[A-Z]/, { message: "Must contain at least one uppercase letter" })
-    .regex(/[0-9]/, { message: "Must contain at least one number" })
     .trim(),
 });

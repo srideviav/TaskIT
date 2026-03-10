@@ -1,6 +1,5 @@
 const User = require('../models/user.model');
 const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
 
 exports.registerUser = async (data) => {
     const { name, email, password } = data;
@@ -24,29 +23,16 @@ exports.existingUser = async (data) => {
     return user;
 };
 
-exports.loginUser = async (data) => {
-    const { email, password } = data;
-
+exports.checkEmailAndPassword = async (email, password) => {
     const user = await User.findOne({ email });
-    if (!user) {
-        throw new Error('Invalid email or password');
-    }
-
+    if (!user) return null;
     const isPasswordValid = await bcrypt.compare(password, user.password);
-    if (!isPasswordValid) {
-        throw new Error('Invalid email or password');
-    }
+    if (!isPasswordValid) return null;
+    return user;  
+};
+ 
 
-    const token = jwt.sign(
-        { id: user._id, email: user.email },
-        process.env.JWT_SECRET,
-        { expiresIn: '1d' }
-    );
-
-    return {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        token
-    }
+exports.getAllUsers = async () => {
+    const users = await User.find();
+    return users;
 }

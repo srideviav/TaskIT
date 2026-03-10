@@ -1,4 +1,5 @@
 const mongoose = require('mongoose');
+const commentSchema = require("./comment.model");
 
 const taskSchema = new mongoose.Schema({
     title: {
@@ -24,11 +25,7 @@ const taskSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
     },
-    comments: [{
-        user: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
-        text: String,
-        createdAt: { type: Date, default: Date.now }
-    }]
+    comments: [commentSchema]
 },
     { timestamps: true }
 )

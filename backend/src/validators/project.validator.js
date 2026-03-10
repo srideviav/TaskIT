@@ -22,6 +22,7 @@ exports.createProjectSchema = z.object({
     })
     .min(1, { message: "Project owner is required" })
     .trim(),
+    members: z.array(z.string()).optional(),
 });
 
 exports.updateProjectSchema = z.object({

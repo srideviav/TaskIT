@@ -51,6 +51,7 @@ exports.updateTask = async (req, res, next) => {
             req.params.taskId,
             req.body,
         );
+        console.log(req.body,"----------------------")
         if (!updatedTask) {
             return res.status(404).json({ message: 'Task not found' });
         }

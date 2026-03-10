@@ -4,7 +4,7 @@ import { createContext, useState, useEffect, ReactNode } from "react";
 import { setAuthToken } from "../lib/axios";
 
 interface IUser {
-  id: string;
+  _id: string;
   name: string;
   email: string;
   token: string;
@@ -24,20 +24,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
-  const storedUser = localStorage.getItem("user");
-  if (storedUser) {
-    const parsedUser = JSON.parse(storedUser);
-    setUser(parsedUser);
-    setAuthToken(parsedUser.token);
-  }
-  setLoading(false);
-}, []);
+    const storedUser = localStorage.getItem("user");
+
+    if (storedUser) {
+      const parsedUser: IUser = JSON.parse(storedUser);
+      setUser(parsedUser);
+      setAuthToken(parsedUser.token);
+    }
+
+    setLoading(false);
+  }, []);
 
   const login = (user: IUser) => {
     localStorage.setItem("user", JSON.stringify(user));
     setUser(user);
     setAuthToken(user.token);
-   };
+  };
 
   const logout = () => {
     localStorage.removeItem("user");

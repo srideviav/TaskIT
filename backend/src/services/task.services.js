@@ -7,13 +7,14 @@ exports.createTask = async (taskData) => {
 exports.getTaskById = async (taskId) => {
     const task = await Task.findById(taskId)
         .populate('assignedTo', 'name email')
-        .populate('projectId', 'name description');
+        .populate('projectId', 'name description')
+        .populate('comments.userId', 'name email');
     return task;
 }
 exports.getTasksByProjectId = async (projectId) => {
     const tasks = await Task.find({ projectId: projectId })
         .populate('assignedTo', 'name email')
-        .populate('projectId', 'name description');
+        .populate('projectId', 'name description')
     return tasks;
 }
 exports.updateTask = async (taskId, taskData) => {
@@ -22,7 +23,11 @@ exports.updateTask = async (taskId, taskData) => {
         taskData, 
         { 
             returnDocument: 'after',
-            runValidators: true});  
+            runValidators: true
+        }
+    ).populate('assignedTo', 'name email')
+     .populate('projectId', 'name description')
+     .populate('comments.userId', 'name email');
     return updatedTask;
 }
 exports.deleteTask = async (taskId) => {

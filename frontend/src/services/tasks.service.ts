@@ -4,7 +4,8 @@ interface Task {
     title: string,
     description: string,
     status: string,
-    assignee: string,
+    assignedTo: string,
+    comments?: string[],
 }
 
 export const createTask = async (task: Task) => {
@@ -29,7 +30,7 @@ export const getAllTasks = async (projectId: String) => {
 
 export const getTask = async (taskId: String) => {
     try {
-        const response = await API.get(`/taskIt/tasks/getByProject/${taskId}`);
+        const response = await API.get(`/taskIt/tasks/get/${taskId}`);
         return response.data.data;
     } catch (error) {
         console.error("Failed to fetch tasks by project:", error);
@@ -43,6 +44,19 @@ export const updateTask = async (taskId: String, task: Task) => {
         return response.data;
     } catch (error) {
         console.error("Failed to update task:", error);
+        throw error;
+    }
+};
+
+export const addComment = async (taskId: String, text: string, userId: string) => {
+    try {
+        const response = await API.put(`/taskIt/tasks/comments/${taskId}`, {
+            text,
+            userId
+        });
+        return response.data;
+    } catch (error) {
+        console.error("Failed to add comment:", error);
         throw error;
     }
 };

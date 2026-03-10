@@ -1,58 +1,72 @@
-import axios from 'axios';
+import axios, { AxiosError, InternalAxiosRequestConfig } from "axios";
+
 
 const API = axios.create({
-    baseURL: 'http://localhost:5000',
-    headers: {
-        'Content-Type': 'application/json',
-    },
-    withCredentials: true,
+  baseURL: "http://localhost:5000",
+  headers: {
+    "Content-Type": "application/json",
+  },
+  // withCredentials: true,
 });
 
-const PUBLIC_ENDPOINTS = ['/auth/login', '/auth/register'];
+const PUBLIC_ENDPOINTS = ["/taskit/users/login", "/taskit/users/register"];
 
-// Request interceptor to add token to all requests except auth endpoints
+// Helper to safely get user from localStorage
+const getStoredUser = () => {
+  if (typeof window === "undefined") return null;
+
+  const storedUser = localStorage.getItem("user");
+  if (!storedUser) return null;
+   try {
+    return JSON.parse(storedUser);
+  } catch {
+    localStorage.removeItem("user");
+    return null;
+  }
+};
+
 API.interceptors.request.use(
-    (config) => {
-        const isPublicEndpoint = PUBLIC_ENDPOINTS.some(endpoint => 
-            config.url?.includes(endpoint)
-        );
+  (config: InternalAxiosRequestConfig) => {
+    const isPublic = PUBLIC_ENDPOINTS.some((ep) =>
+      config.url?.includes(ep)
+    );
 
-        if (!isPublicEndpoint) {
-            const storedUser = localStorage.getItem('user');
-            if (storedUser) {
-                const user = JSON.parse(storedUser);
-                if (user.token) {
-                    config.headers.Authorization = `Bearer ${user.token}`;
-                }
-            }
-        }
-        return config;
-    },
-    (error) => {
-        return Promise.reject(error);
+    if (!isPublic) {
+      const token = getStoredUser()?.token;
+
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      }
     }
+
+    return config;
+  },
+  (error) => Promise.reject(error)
 );
 
-// Response interceptor to handle 401 errors
 API.interceptors.response.use(
-    (response) => response,
-    (error) => {
-        if (error.response?.status === 401) {
-            // Token expired or invalid - clear user data
-            localStorage.removeItem('user');
-            // Optionally refresh page or redirect to login
-            window.location.href = '/login';
-        }
-        return Promise.reject(error);
+  (response) => response,
+  (error: AxiosError) => {
+    if (typeof window !== "undefined") {
+      if (error.response?.status === 401) {
+        console.warn("Session expired. Redirecting to login.");
+
+        localStorage.removeItem("user");
+        window.location.href = "/login";
+      }
     }
+
+    return Promise.reject(error);
+  }
 );
 
+// Set or remove token manually
 export const setAuthToken = (token: string | null) => {
-    if (token) {
-        API.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-    } else {
-        delete API.defaults.headers.common['Authorization'];
-    }
-}
+   if (token) {
+    API.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+  } else {
+    delete API.defaults.headers.common["Authorization"];
+  }
+};
 
 export default API;
